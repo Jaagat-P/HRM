@@ -111,6 +111,14 @@ document.getElementById("loadDemo").addEventListener("click", () => {
 });
 
 buildGrid();
+
+// Auto-load the bundled sample trajectory when served over http(s).
+if (location.protocol.startsWith("http")) {
+  fetch("sample_trajectory.json")
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((obj) => { document.getElementById("json").value = JSON.stringify(obj); load(obj); })
+    .catch(() => {});
+}
 </script>
 </body>
 </html>
