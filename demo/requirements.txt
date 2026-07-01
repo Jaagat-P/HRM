@@ -1,0 +1,6 @@
+# Minimal dependencies to run the CPU/MPS Sudoku demo (no CUDA / FlashAttention needed).
+torch
+huggingface_hub
+pyyaml
+einops
+pydantic
