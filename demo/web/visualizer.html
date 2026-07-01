@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HRM Sudoku Reasoning Visualizer</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 640px; color: #222; }
+  h1 { font-size: 1.3rem; }
+  #grid { display: grid; grid-template-columns: repeat(9, 1fr); width: 360px; margin: 1rem 0;
+          border: 3px solid #222; }
+  .cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+          font-size: 1.2rem; border: 1px solid #bbb; }
+  .cell.given { font-weight: 700; background: #f0f0f0; }
+  .cell.changed { background: #fff3b0; }
+  .cell.br { border-right: 3px solid #222; }
+  .cell.bb { border-bottom: 3px solid #222; }
+  .controls { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+  #status { color: #555; font-size: .9rem; }
+  textarea { width: 100%; height: 90px; font-family: monospace; }
+</style>
+</head>
+<body>
+  <h1>HRM Sudoku Reasoning Visualizer</h1>
+  <p>Paste a trajectory JSON (from <code>demo.export.export_json</code>) or load a file, then
+     scrub through the model's reasoning steps.</p>
+
+  <div class="controls">
+    <input type="file" id="file" accept="application/json" />
+    <button id="loadDemo">Load sample</button>
+  </div>
+  <textarea id="json" placeholder='{"puzzle": "...", "trajectory": ["...", "..."] }'></textarea>
+
+  <div id="grid"></div>
+
+  <div class="controls">
+    <button id="play">▶ Play</button>
+    <input type="range" id="slider" min="0" max="0" value="0" />
+    <span id="status">no data</span>
+  </div>
+
+<script>
+const gridEl = document.getElementById("grid");
+const slider = document.getElementById("slider");
+const statusEl = document.getElementById("status");
+let data = null, timer = null;
+
+function buildGrid() {
+  gridEl.innerHTML = "";
+  for (let i = 0; i < 81; i++) {
+    const c = document.createElement("div");
+    c.className = "cell";
+    const col = i % 9, row = Math.floor(i / 9);
+    if (col === 2 || col === 5) c.classList.add("br");
+    if (row === 2 || row === 5) c.classList.add("bb");
+    gridEl.appendChild(c);
+  }
+}
+
+function render(step) {
+  if (!data) return;
+  const board = data.trajectory[step];
+  const prev = step > 0 ? data.trajectory[step - 1] : null;
+  const givens = data.puzzle;
+  [...gridEl.children].forEach((cell, i) => {
+    const v = board[i];
+    cell.textContent = v === "0" ? "" : v;
+    cell.classList.toggle("given", givens[i] !== "0");
+    cell.classList.toggle("changed", prev !== null && board[i] !== prev[i]);
+  });
+  statusEl.textContent = `step ${step + 1} / ${data.trajectory.length}`;
+}
+
+function load(obj) {
+  data = obj;
+  slider.max = data.trajectory.length - 1;
+  slider.value = 0;
+  render(0);
+}
+
+slider.addEventListener("input", () => render(+slider.value));
+
+document.getElementById("play").addEventListener("click", () => {
+  if (!data) return;
+  if (timer) { clearInterval(timer); timer = null; return; }
+  let step = +slider.value;
+  timer = setInterval(() => {
+    step = (step + 1) % data.trajectory.length;
+    slider.value = step;
+    render(step);
+    if (step === data.trajectory.length - 1) { clearInterval(timer); timer = null; }
+  }, 500);
+});
+
+document.getElementById("file").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then((t) => { document.getElementById("json").value = t; load(JSON.parse(t)); });
+});
+
+document.getElementById("json").addEventListener("change", (e) => {
+  try { load(JSON.parse(e.target.value)); } catch (_) { statusEl.textContent = "invalid JSON"; }
+});
+
+document.getElementById("loadDemo").addEventListener("click", () => {
+  const blank = "0".repeat(81);
+  const solved = "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
+  const sample = { puzzle: blank, trajectory: [blank, solved] };
+  document.getElementById("json").value = JSON.stringify(sample);
+  load(sample);
+});
+
+buildGrid();
+</script>
+</body>
+</html>
