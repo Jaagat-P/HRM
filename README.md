@@ -12,6 +12,15 @@ Read Our Paper: [https://arxiv.org/abs/2506.21734](https://arxiv.org/abs/2506.21
 
 **Join Our Discord Community: [https://discord.gg/sapient](https://discord.gg/sapient)**
 
+## Run on a laptop (no GPU) 💻
+
+Want to try HRM without an NVIDIA GPU or FlashAttention? See [`demo/`](./demo/README.md) for a
+CPU / Apple Silicon Sudoku solver built on the pretrained checkpoint:
+
+```bash
+pip install -r demo/requirements.txt
+python -m demo.cli --example hard --animate
+```
 
 ## Quick Start Guide 🚀
 
