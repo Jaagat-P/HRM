@@ -6,11 +6,41 @@ import torch.nn.functional as F
 
 try:
     from flash_attn_interface import flash_attn_func  # type: ignore[import]
+    FLASH_ATTN_AVAILABLE = True
 except ImportError:
-    # Fallback to FlashAttention 2
-    from flash_attn import flash_attn_func  # type: ignore[import]
+    try:
+        # Fallback to FlashAttention 2
+        from flash_attn import flash_attn_func  # type: ignore[import]
+        FLASH_ATTN_AVAILABLE = True
+    except ImportError:
+        # No FlashAttention available (e.g. CPU or Apple Silicon / MPS).
+        # Fall back to PyTorch's native scaled_dot_product_attention below.
+        flash_attn_func = None
+        FLASH_ATTN_AVAILABLE = False
 
 from models.common import trunc_normal_init_
+
+
+def _sdpa_attn_func(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, causal: bool = False) -> torch.Tensor:
+    """FlashAttention-compatible attention using PyTorch's scaled_dot_product_attention.
+
+    FlashAttention expects q/k/v as [batch, seq_len, num_heads, head_dim] and returns the
+    same layout. F.scaled_dot_product_attention expects [batch, num_heads, seq_len, head_dim],
+    so we transpose in and out. Grouped-query attention (fewer KV heads than Q heads) is handled
+    via enable_gqa, matching FlashAttention's broadcasting behavior.
+    """
+    num_heads = q.shape[-2]
+    num_kv_heads = k.shape[-2]
+
+    q = q.transpose(1, 2)  # -> [batch, num_heads, seq_len, head_dim]
+    k = k.transpose(1, 2)
+    v = v.transpose(1, 2)
+
+    out = F.scaled_dot_product_attention(q, k, v, is_causal=causal, enable_gqa=num_kv_heads != num_heads)
+
+    # .contiguous() so the downstream .view() in Attention.forward works (FlashAttention
+    # returns a contiguous tensor; the transpose here would otherwise leave it strided).
+    return out.transpose(1, 2).contiguous()  # -> [batch, seq_len, num_heads, head_dim]
 
 
 CosSin = Tuple[torch.Tensor, torch.Tensor]
@@ -126,10 +156,13 @@ class Attention(nn.Module):
             cos, sin = cos_sin
             query, key = apply_rotary_pos_emb(query, key, cos, sin)
 
-        # flash attn
-        attn_output = flash_attn_func(q=query, k=key, v=value, causal=self.causal)
-        if isinstance(attn_output, tuple):  # fa2 and fa3 compatibility
-            attn_output = attn_output[0]
+        # Attention: use FlashAttention when available, otherwise PyTorch SDPA fallback.
+        if FLASH_ATTN_AVAILABLE:
+            attn_output = flash_attn_func(q=query, k=key, v=value, causal=self.causal)
+            if isinstance(attn_output, tuple):  # fa2 and fa3 compatibility
+                attn_output = attn_output[0]
+        else:
+            attn_output = _sdpa_attn_func(q=query, k=key, v=value, causal=self.causal)
 
         attn_output = attn_output.view(batch_size, seq_len, self.output_size)  # type: ignore
         return self.o_proj(attn_output)
