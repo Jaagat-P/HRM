@@ -42,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--device", default=None, help="force a device (cpu/mps/cuda)")
     p.add_argument("--trace", action="store_true", help="print the board after every reasoning step")
     p.add_argument("--animate", action="store_true", help="animate the reasoning trajectory in place")
+    p.add_argument("--export-json", metavar="PATH", help="write the trajectory JSON to PATH (for the web visualizer)")
     return p
 
 
@@ -69,6 +70,11 @@ def main(argv=None) -> int:
             print(f"--- step {i}/{result.num_steps} ---")
             print(format_board(board))
             print()
+
+    if args.export_json:
+        from demo.export import export_json
+        export_json(normalized, result, args.export_json)
+        print(f"Wrote trajectory JSON to {args.export_json}\n")
 
     print("Solution:")
     print(format_board(result.final_board))
