@@ -41,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="HuggingFace repo id or local dir of the checkpoint")
     p.add_argument("--device", default=None, help="force a device (cpu/mps/cuda)")
     p.add_argument("--trace", action="store_true", help="print the board after every reasoning step")
+    p.add_argument("--animate", action="store_true", help="animate the reasoning trajectory in place")
     return p
 
 
@@ -58,6 +59,10 @@ def main(argv=None) -> int:
     print()
 
     result = solve_puzzle(loaded, puzzle)
+
+    if args.animate:
+        from demo.animate import animate
+        animate(result.trajectory)
 
     if args.trace:
         for i, board in enumerate(result.trajectory, 1):
