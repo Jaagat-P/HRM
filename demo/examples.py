@@ -18,6 +18,18 @@ EXAMPLES: Dict[str, str] = {
         "000419005"
         "000080079"
     ),
+    # A moderate puzzle (24 givens).
+    "medium": (
+        "100920000"
+        "524010000"
+        "000000070"
+        "050008102"
+        "000000000"
+        "402700090"
+        "060000000"
+        "000030945"
+        "000071006"
+    ),
     # A hard puzzle with only 17 givens (the minimum for a unique solution).
     "hard": (
         "000000010"
